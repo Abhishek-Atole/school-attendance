@@ -9,7 +9,8 @@ import {
   Calendar,
   BarChart3,
   Settings,
-  Shield
+  Shield,
+  Bell
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -56,6 +57,12 @@ const Sidebar = ({ isOpen, onClose }) => {
         name: 'Analytics',
         href: '/analytics',
         icon: BarChart3,
+        roles: ['ADMIN', 'TEACHER']
+      },
+      {
+        name: 'Notifications',
+        href: '/notifications',
+        icon: Bell,
         roles: ['ADMIN', 'TEACHER']
       }
     ];

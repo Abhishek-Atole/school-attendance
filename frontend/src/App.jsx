@@ -12,6 +12,7 @@ import Teachers from './pages/Teachers';
 import Attendance from './pages/Attendance';
 import Reports from './pages/Reports';
 import Analytics from './pages/Analytics';
+import Notifications from './pages/Notifications';
 
 // Import layout and auth components
 import Layout from './components/Layout';
@@ -94,6 +95,16 @@ function App() {
                           element={
                             <PrivateRoute requiredRole={['ADMIN', 'TEACHER']}>
                               <Analytics />
+                            </PrivateRoute>
+                          } 
+                        />
+                        
+                        {/* Notifications - Admin and Teacher */}
+                        <Route 
+                          path="/notifications" 
+                          element={
+                            <PrivateRoute requiredRole={['ADMIN', 'TEACHER']}>
+                              <Notifications />
                             </PrivateRoute>
                           } 
                         />

@@ -2,7 +2,11 @@ package com.school.attendance.controller;
 
 import com.school.attendance.entity.AttendanceRecord;
 import com.school.attendance.entity.AttendanceRecord.AttendanceStatus;
+import com.school.attendance.entity.School;
 import com.school.attendance.service.AttendanceService;
+import com.school.attendance.util.report.CsvReportGenerator;
+import com.school.attendance.util.report.ExcelReportGenerator;
+import com.school.attendance.util.report.PdfReportGenerator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,11 +18,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,6 +37,9 @@ import java.util.Optional;
 public class AttendanceController {
 
     private final AttendanceService attendanceService;
+    private final CsvReportGenerator csvReportGenerator;
+    private final ExcelReportGenerator excelReportGenerator;
+    private final PdfReportGenerator pdfReportGenerator;
 
     @PostMapping("/mark-daily")
     @Operation(summary = "Mark daily attendance", description = "Marks attendance for all students in a school for a specific date")
@@ -377,5 +387,128 @@ public class AttendanceController {
         public boolean isExists() { return exists; }
         public Long getStudentId() { return studentId; }
         public LocalDate getDate() { return date; }
+    }
+
+    // Export endpoints
+    @GetMapping("/export/csv")
+    @Operation(summary = "Export attendance report as CSV", description = "Export attendance summary report in CSV format")
+    public ResponseEntity<byte[]> exportAttendanceCSV(
+            @Parameter(description = "School ID") @RequestParam Long schoolId,
+            @Parameter(description = "Start date") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "End date") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Report type") @RequestParam(defaultValue = "COMPREHENSIVE") String reportType) {
+        
+        try {
+            // Get attendance summaries
+            List<AttendanceService.AttendanceSummary> summaries = attendanceService.getAttendanceSummary(
+                schoolId, startDate, endDate);
+            
+            // Get school details (for now, we'll create a mock school object)
+            School school = createMockSchool(schoolId);
+            
+            // Generate CSV
+            byte[] csvData = csvReportGenerator.generateAttendanceReport(summaries, school, startDate, endDate, reportType);
+            
+            // Set response headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.TEXT_PLAIN);
+            headers.setContentDispositionFormData("attachment", 
+                String.format("attendance_report_%s_%s.csv", 
+                    startDate.format(DateTimeFormatter.ofPattern("ddMMyyyy")),
+                    endDate.format(DateTimeFormatter.ofPattern("ddMMyyyy"))));
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(csvData);
+                    
+        } catch (Exception e) {
+            log.error("Error exporting CSV report: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/export/excel")
+    @Operation(summary = "Export attendance report as Excel", description = "Export attendance summary report in Excel format")
+    public ResponseEntity<byte[]> exportAttendanceExcel(
+            @Parameter(description = "School ID") @RequestParam Long schoolId,
+            @Parameter(description = "Start date") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "End date") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Report type") @RequestParam(defaultValue = "COMPREHENSIVE") String reportType) {
+        
+        try {
+            // Get attendance summaries
+            List<AttendanceService.AttendanceSummary> summaries = attendanceService.getAttendanceSummary(
+                schoolId, startDate, endDate);
+            
+            // Get school details (for now, we'll create a mock school object)
+            School school = createMockSchool(schoolId);
+            
+            // Generate Excel
+            byte[] excelData = excelReportGenerator.generateAttendanceReport(summaries, school, startDate, endDate, reportType);
+            
+            // Set response headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", 
+                String.format("attendance_report_%s_%s.xlsx", 
+                    startDate.format(DateTimeFormatter.ofPattern("ddMMyyyy")),
+                    endDate.format(DateTimeFormatter.ofPattern("ddMMyyyy"))));
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(excelData);
+                    
+        } catch (Exception e) {
+            log.error("Error exporting Excel report: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/export/pdf")
+    @Operation(summary = "Export attendance report as PDF", description = "Export attendance summary report in PDF format")
+    public ResponseEntity<byte[]> exportAttendancePDF(
+            @Parameter(description = "School ID") @RequestParam Long schoolId,
+            @Parameter(description = "Start date") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "End date") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Report type") @RequestParam(defaultValue = "COMPREHENSIVE") String reportType) {
+        
+        try {
+            // Get attendance summaries
+            List<AttendanceService.AttendanceSummary> summaries = attendanceService.getAttendanceSummary(
+                schoolId, startDate, endDate);
+            
+            // Get school details (for now, we'll create a mock school object)
+            School school = createMockSchool(schoolId);
+            
+            // Generate PDF
+            byte[] pdfData = pdfReportGenerator.generateAttendanceReport(summaries, school, startDate, endDate, reportType);
+            
+            // Set response headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", 
+                String.format("attendance_report_%s_%s.pdf", 
+                    startDate.format(DateTimeFormatter.ofPattern("ddMMyyyy")),
+                    endDate.format(DateTimeFormatter.ofPattern("ddMMyyyy"))));
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfData);
+                    
+        } catch (Exception e) {
+            log.error("Error exporting PDF report: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // Helper method to create mock school object (until we implement SchoolService)
+    private School createMockSchool(Long schoolId) {
+        School school = new School();
+        school.setId(schoolId);
+        school.setName("Sample School");
+        school.setAddress("123 Education Street, Learning City, Knowledge State - 123456");
+        school.setContactEmail("info@sampleschool.edu");
+        school.setContactPhone("+91-98765-43210");
+        return school;
     }
 }

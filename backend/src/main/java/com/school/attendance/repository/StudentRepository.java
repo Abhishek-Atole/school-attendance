@@ -43,6 +43,11 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
             Long schoolId, String standard);
 
     /**
+     * Find all active students in a school
+     */
+    List<Student> findBySchoolIdAndIsActiveTrueOrderByStandardAscSectionAscRollNoAsc(Long schoolId);
+
+    /**
      * Search students by name (first name or last name)
      */
     @Query("SELECT s FROM Student s WHERE s.schoolId = :schoolId AND s.isActive = true AND " +

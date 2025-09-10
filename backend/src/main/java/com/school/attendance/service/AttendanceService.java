@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -329,6 +330,23 @@ public class AttendanceService {
         
         return new DailyAttendanceResult(allStudents.size(), successCount, failureCount, 
                                        createdRecords, date, isHoliday);
+    }
+
+    /**
+     * Get attendance summary for all students in a school
+     */
+    @Transactional(readOnly = true)
+    public List<AttendanceSummary> getAttendanceSummary(Long schoolId, LocalDate startDate, LocalDate endDate) {
+        // Get all students in the school
+        List<Student> students = studentRepository.findBySchoolIdAndIsActiveTrueOrderByStandardAscSectionAscRollNoAsc(schoolId);
+        
+        return students.stream()
+                .map(student -> {
+                    List<AttendanceRecord> records = attendanceRecordRepository
+                            .findByStudentIdAndDateBetweenOrderByDateDesc(student.getId(), startDate, endDate);
+                    return calculateAttendanceSummary(student, records, startDate, endDate);
+                })
+                .collect(Collectors.toList());
     }
 
     /**

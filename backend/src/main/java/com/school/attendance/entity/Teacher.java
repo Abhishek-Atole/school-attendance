@@ -17,7 +17,7 @@ import java.util.Set;
 @Entity
 @Table(name = "teachers", 
        uniqueConstraints = {
-           @UniqueConstraint(columnNames = {"empNo", "school_id"}),
+           @UniqueConstraint(columnNames = {"emp_no", "school_id"}),
            @UniqueConstraint(columnNames = {"email"})
        })
 @EntityListeners(AuditingEntityListener.class)

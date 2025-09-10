@@ -1,0 +1,347 @@
+package com.school.attendance.service.notification;
+
+import com.school.attendance.entity.NotificationLog;
+import com.school.attendance.entity.NotificationSettings;
+import com.school.attendance.entity.Student;
+import com.school.attendance.entity.School;
+import com.school.attendance.repository.NotificationLogRepository;
+import com.school.attendance.repository.NotificationSettingsRepository;
+import com.school.attendance.repository.SchoolRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+@Service
+public class NotificationService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(NotificationService.class);
+    
+    @Autowired
+    private EmailService emailService;
+    
+    @Autowired
+    private SmsService smsService;
+    
+    @Autowired
+    private NotificationLogRepository notificationLogRepository;
+    
+    @Autowired
+    private NotificationSettingsRepository settingsRepository;
+    
+    @Autowired(required = false)
+    private SchoolRepository schoolRepository;
+
+    /**
+     * Send email notification
+     */
+    public boolean sendEmail(String to, String subject, String body) {
+        return sendEmail(to, subject, body, null, null);
+    }
+
+    /**
+     * Send email notification with logging
+     */
+    public boolean sendEmail(String to, String subject, String body, Long studentId, Long schoolId) {
+        logger.info("Sending email to: {}, subject: {}", to, subject);
+        
+        boolean success = emailService.sendEmail(to, subject, body);
+        
+        // Log the notification
+        logNotification(
+            NotificationLog.NotificationType.EMAIL,
+            to,
+            subject,
+            body,
+            success ? NotificationLog.NotificationStatus.SENT : NotificationLog.NotificationStatus.FAILED,
+            studentId,
+            schoolId
+        );
+        
+        return success;
+    }
+
+    /**
+     * Send SMS notification
+     */
+    public boolean sendSms(String to, String message) {
+        return sendSms(to, message, null, null);
+    }
+
+    /**
+     * Send SMS notification with logging
+     */
+    public boolean sendSms(String to, String message, Long studentId, Long schoolId) {
+        logger.info("Sending SMS to: {}", to);
+        
+        boolean success = smsService.sendSms(to, message);
+        
+        // Log the notification
+        logNotification(
+            NotificationLog.NotificationType.SMS,
+            to,
+            "SMS",
+            message,
+            success ? NotificationLog.NotificationStatus.SENT : NotificationLog.NotificationStatus.FAILED,
+            studentId,
+            schoolId
+        );
+        
+        return success;
+    }
+
+    /**
+     * Send daily absentee alert
+     */
+    public void sendDailyAbsenteeAlert(Student student, String parentEmail, String parentPhone) {
+        Long schoolId = student.getSchool() != null ? student.getSchool().getId() : null;
+        NotificationSettings settings = getNotificationSettings(schoolId);
+        
+        if (settings == null || !settings.getDailyAbsenteeAlerts()) {
+            logger.info("Daily absentee alerts disabled for school: {}", schoolId);
+            return;
+        }
+
+        String subject = "Daily Attendance Alert - " + student.getFullName();
+        String message = String.format(
+            "Dear Parent,\n\n" +
+            "This is to inform you that your child %s (Roll No: %s) from %s was marked absent today (%s).\n\n" +
+            "If this is an error, please contact the school immediately.\n\n" +
+            "Thank you,\n" +
+            "%s",
+            student.getFullName(),
+            student.getRollNo(),
+            student.getStandard() + (student.getSection() != null ? "-" + student.getSection() : ""),
+            java.time.LocalDate.now().toString(),
+            student.getSchool() != null ? student.getSchool().getName() : "School Administration"
+        );
+
+        // Send email if enabled
+        if (settings.getEmailEnabled() && parentEmail != null && !parentEmail.trim().isEmpty()) {
+            sendEmail(parentEmail, subject, message, student.getId(), schoolId);
+        }
+
+        // Send SMS if enabled
+        if (settings.getSmsEnabled() && parentPhone != null && !parentPhone.trim().isEmpty()) {
+            String smsMessage = String.format(
+                "ATTENDANCE ALERT: %s was absent today. Contact school if this is an error. - %s",
+                student.getFirstName(),
+                student.getSchool() != null ? student.getSchool().getName() : "School"
+            );
+            sendSms(parentPhone, smsMessage, student.getId(), schoolId);
+        }
+    }
+
+    /**
+     * Send low attendance alert
+     */
+    public void sendLowAttendanceAlert(Student student, double attendancePercentage, String parentEmail, String parentPhone) {
+        Long schoolId = student.getSchool() != null ? student.getSchool().getId() : null;
+        NotificationSettings settings = getNotificationSettings(schoolId);
+        
+        if (settings == null || !settings.getLowAttendanceAlerts()) {
+            logger.info("Low attendance alerts disabled for school: {}", schoolId);
+            return;
+        }
+
+        // Check if attendance is below threshold
+        if (attendancePercentage >= settings.getAttendanceThreshold()) {
+            return; // No alert needed
+        }
+
+        String subject = "Low Attendance Alert - " + student.getFullName();
+        String message = String.format(
+            "Dear Parent,\n\n" +
+            "This is to inform you that your child %s (Roll No: %s) from %s has low attendance.\n\n" +
+            "Current Attendance: %.1f%%\n" +
+            "Required Minimum: %.1f%%\n\n" +
+            "Please ensure regular attendance to avoid academic issues.\n\n" +
+            "Thank you,\n" +
+            "%s",
+            student.getFullName(),
+            student.getRollNo(),
+            student.getStandard() + (student.getSection() != null ? "-" + student.getSection() : ""),
+            attendancePercentage,
+            settings.getAttendanceThreshold(),
+            student.getSchool() != null ? student.getSchool().getName() : "School Administration"
+        );
+
+        // Send email if enabled
+        if (settings.getEmailEnabled() && parentEmail != null && !parentEmail.trim().isEmpty()) {
+            sendEmail(parentEmail, subject, message, student.getId(), schoolId);
+        }
+
+        // Send SMS if enabled
+        if (settings.getSmsEnabled() && parentPhone != null && !parentPhone.trim().isEmpty()) {
+            String smsMessage = String.format(
+                "LOW ATTENDANCE: %s has %.1f%% attendance (Required: %.1f%%). Please ensure regular attendance.",
+                student.getFirstName(),
+                attendancePercentage,
+                settings.getAttendanceThreshold()
+            );
+            sendSms(parentPhone, smsMessage, student.getId(), schoolId);
+        }
+    }
+
+    /**
+     * Send holiday notification
+     */
+    public void sendHolidayNotification(List<Student> students, String holidayMessage) {
+        for (Student student : students) {
+            Long schoolId = student.getSchool() != null ? student.getSchool().getId() : null;
+            NotificationSettings settings = getNotificationSettings(schoolId);
+            
+            if (settings == null || !settings.getHolidayNotifications()) {
+                continue;
+            }
+
+            String subject = "Holiday Notification";
+            String email = student.getParentEmail();
+            String phone = student.getParentMobile();
+
+            // Send email if enabled
+            if (settings.getEmailEnabled() && email != null && !email.trim().isEmpty()) {
+                sendEmail(email, subject, holidayMessage, student.getId(), schoolId);
+            }
+
+            // Send SMS if enabled
+            if (settings.getSmsEnabled() && phone != null && !phone.trim().isEmpty()) {
+                sendSms(phone, holidayMessage, student.getId(), schoolId);
+            }
+        }
+    }
+
+    /**
+     * Get notification settings for a school
+     */
+    public NotificationSettings getNotificationSettings(Long schoolId) {
+        if (schoolId == null) {
+            return createDefaultSettings(null);
+        }
+        
+        Optional<NotificationSettings> settings = settingsRepository.findBySchoolId(schoolId);
+        return settings.orElse(createDefaultSettings(schoolId));
+    }
+
+    /**
+     * Update notification settings with schoolId and data map
+     */
+    public NotificationSettings updateNotificationSettings(Long schoolId, Map<String, Object> settingsData) {
+        NotificationSettings settings = getNotificationSettings(schoolId);
+        
+        // Update fields if present in the data map
+        if (settingsData.containsKey("emailEnabled")) {
+            settings.setEmailEnabled((Boolean) settingsData.get("emailEnabled"));
+        }
+        if (settingsData.containsKey("smsEnabled")) {
+            settings.setSmsEnabled((Boolean) settingsData.get("smsEnabled"));
+        }
+        if (settingsData.containsKey("dailyAbsenteeAlerts")) {
+            settings.setDailyAbsenteeAlerts((Boolean) settingsData.get("dailyAbsenteeAlerts"));
+        }
+        if (settingsData.containsKey("lowAttendanceAlerts")) {
+            settings.setLowAttendanceAlerts((Boolean) settingsData.get("lowAttendanceAlerts"));
+        }
+        if (settingsData.containsKey("holidayNotifications")) {
+            settings.setHolidayNotifications((Boolean) settingsData.get("holidayNotifications"));
+        }
+        if (settingsData.containsKey("attendanceThreshold")) {
+            settings.setAttendanceThreshold(((Number) settingsData.get("attendanceThreshold")).doubleValue());
+        }
+        if (settingsData.containsKey("notificationTime")) {
+            settings.setNotificationTime((String) settingsData.get("notificationTime"));
+        }
+        
+        return settingsRepository.save(settings);
+    }
+
+    /**
+     * Get notification logs with pagination
+     */
+    public Page<NotificationLog> getNotificationLogs(Pageable pageable) {
+        return notificationLogRepository.findAll(pageable);
+    }
+
+    /**
+     * Get notification logs by type
+     */
+    public List<NotificationLog> getNotificationLogsByType(NotificationLog.NotificationType type) {
+        return notificationLogRepository.findByType(type);
+    }
+
+    /**
+     * Get notification statistics
+     */
+    public Map<String, Object> getNotificationStats() {
+        Map<String, Object> stats = new HashMap<>();
+        
+        long totalNotifications = notificationLogRepository.count();
+        long sentNotifications = notificationLogRepository.countByStatus(NotificationLog.NotificationStatus.SENT);
+        long failedNotifications = notificationLogRepository.countByStatus(NotificationLog.NotificationStatus.FAILED);
+        long emailNotifications = notificationLogRepository.countByType(NotificationLog.NotificationType.EMAIL);
+        long smsNotifications = notificationLogRepository.countByType(NotificationLog.NotificationType.SMS);
+        
+        stats.put("totalNotifications", totalNotifications);
+        stats.put("sentNotifications", sentNotifications);
+        stats.put("failedNotifications", failedNotifications);
+        stats.put("emailNotifications", emailNotifications);
+        stats.put("smsNotifications", smsNotifications);
+        stats.put("successRate", totalNotifications > 0 ? (double) sentNotifications / totalNotifications * 100 : 0);
+        
+        return stats;
+    }
+
+    /**
+     * Create default notification settings
+     */
+    private NotificationSettings createDefaultSettings(Long schoolId) {
+        School school = null;
+        if (schoolId != null && schoolRepository != null) {
+            school = schoolRepository.findById(schoolId).orElse(null);
+        }
+        
+        NotificationSettings settings = new NotificationSettings();
+        settings.setSchool(school);
+        settings.setEmailEnabled(true);
+        settings.setSmsEnabled(true);
+        settings.setDailyAbsenteeAlerts(true);
+        settings.setLowAttendanceAlerts(true);
+        settings.setHolidayNotifications(true);
+        settings.setAttendanceThreshold(75.0);
+        settings.setNotificationTime("20:00");
+        
+        return settingsRepository.save(settings);
+    }
+
+    /**
+     * Log notification activity
+     */
+    private void logNotification(NotificationLog.NotificationType type, String recipient, 
+                               String subject, String message, NotificationLog.NotificationStatus status,
+                               Long studentId, Long schoolId) {
+        try {
+            NotificationLog log = new NotificationLog();
+            log.setType(type);
+            log.setRecipient(recipient);
+            log.setSubject(subject);
+            log.setMessage(message);
+            log.setStatus(status);
+            log.setStudentId(studentId);
+            log.setSchoolId(schoolId);
+            log.setSentAt(LocalDateTime.now());
+            
+            notificationLogRepository.save(log);
+            
+        } catch (Exception e) {
+            logger.error("Error logging notification: {}", e.getMessage(), e);
+        }
+    }
+}

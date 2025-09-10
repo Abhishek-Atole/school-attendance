@@ -19,8 +19,8 @@ import java.util.List;
 @Entity
 @Table(name = "students", 
        uniqueConstraints = {
-           @UniqueConstraint(columnNames = {"grNo", "school_id"}),
-           @UniqueConstraint(columnNames = {"rollNo", "standard", "section", "school_id"})
+           @UniqueConstraint(columnNames = {"gr_no", "school_id"}),
+           @UniqueConstraint(columnNames = {"roll_no", "standard", "section", "school_id"})
        })
 @EntityListeners(AuditingEntityListener.class)
 @Data
@@ -77,6 +77,10 @@ public class Student {
     @Pattern(regexp = "^\\+?[1-9]\\d{1,14}$", message = "Invalid parent mobile number format")
     @Column(name = "parent_mobile", length = 15)
     private String parentMobile;
+
+    @Pattern(regexp = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", message = "Invalid parent email format")
+    @Column(name = "parent_email", length = 100)
+    private String parentEmail;
 
     @Column(name = "profile_photo_path")
     private String profilePhotoPath;

@@ -110,4 +110,9 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
                                                @Param("startDate") java.time.LocalDate startDate,
                                                @Param("endDate") java.time.LocalDate endDate,
                                                @Param("threshold") double threshold);
+
+    /**
+     * Find all active students
+     */
+    List<Student> findByIsActiveTrue();
 }

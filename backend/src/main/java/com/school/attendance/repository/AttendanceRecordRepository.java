@@ -80,6 +80,17 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
     List<Object[]> getDailyAttendanceSummary(@Param("schoolId") Long schoolId, @Param("date") LocalDate date);
 
     /**
+     * Find attendance records by date and status
+     */
+    List<AttendanceRecord> findByDateAndStatus(LocalDate date, AttendanceStatus status);
+
+    /**
+     * Find attendance records for a student between dates
+     */
+    List<AttendanceRecord> findByStudentAndDateBetween(com.school.attendance.entity.Student student, 
+                                                      LocalDate startDate, LocalDate endDate);
+
+    /**
      * Find students not marked for attendance on a specific date
      */
     @Query("SELECT s FROM Student s WHERE s.schoolId = :schoolId AND s.standard = :standard AND " +

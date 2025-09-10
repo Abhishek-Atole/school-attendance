@@ -31,22 +31,55 @@ public class AttendanceController {
 
     private final AttendanceService attendanceService;
 
-    @PostMapping("/mark")
-    @Operation(summary = "Mark attendance for a student", description = "Marks attendance for a single student")
-    public ResponseEntity<AttendanceRecord> markAttendance(
-            @Valid @RequestBody AttendanceMarkRequest request) {
+    @PostMapping("/mark-daily")
+    @Operation(summary = "Mark daily attendance", description = "Marks attendance for all students in a school for a specific date")
+    public ResponseEntity<AttendanceService.DailyAttendanceResult> markDailyAttendance(
+            @Valid @RequestBody DailyAttendanceMarkRequest request) {
         try {
-            AttendanceRecord record = attendanceService.markAttendance(
-                request.getStudentId(),
+            AttendanceService.DailyAttendanceResult result = attendanceService.markDailyAttendance(
+                request.getSchoolId(),
                 request.getDate(),
-                request.getStatus(),
-                request.getNote(),
+                request.getAbsentStudentIds(),
+                request.getAbsentTeacherIds(),
+                request.isHoliday(),
                 request.getTeacherId()
             );
-            return ResponseEntity.status(HttpStatus.CREATED).body(record);
+            return ResponseEntity.ok(result);
         } catch (IllegalArgumentException e) {
-            log.error("Error marking attendance: {}", e.getMessage());
+            log.error("Error marking daily attendance: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/summary/student/{studentId}")
+    @Operation(summary = "Get student attendance summary", description = "Gets detailed attendance summary for a student")
+    public ResponseEntity<AttendanceService.AttendanceSummary> getStudentAttendanceSummary(
+            @Parameter(description = "Student ID") @PathVariable Long studentId,
+            @Parameter(description = "Start date") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @Parameter(description = "End date") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
+        
+        try {
+            AttendanceService.AttendanceSummary summary = attendanceService.getAttendanceSummaryForStudent(studentId, start, end);
+            return ResponseEntity.ok(summary);
+        } catch (IllegalArgumentException e) {
+            log.error("Error getting student summary: {}", e.getMessage());
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/summary/teacher/{teacherId}")
+    @Operation(summary = "Get teacher attendance summary", description = "Gets detailed attendance summary for a teacher")
+    public ResponseEntity<AttendanceService.AttendanceSummary> getTeacherAttendanceSummary(
+            @Parameter(description = "Teacher ID") @PathVariable Long teacherId,
+            @Parameter(description = "Start date") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @Parameter(description = "End date") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
+        
+        try {
+            AttendanceService.AttendanceSummary summary = attendanceService.getAttendanceSummaryForTeacher(teacherId, start, end);
+            return ResponseEntity.ok(summary);
+        } catch (IllegalArgumentException e) {
+            log.error("Error getting teacher summary: {}", e.getMessage());
+            return ResponseEntity.notFound().build();
         }
     }
 
@@ -206,6 +239,31 @@ public class AttendanceController {
     }
 
     // Request DTOs
+    public static class DailyAttendanceMarkRequest {
+        private Long schoolId;
+        private LocalDate date;
+        private List<Long> absentStudentIds;
+        private List<Long> absentTeacherIds;
+        private boolean isHoliday;
+        private Long teacherId;
+
+        // Constructors, getters, and setters
+        public DailyAttendanceMarkRequest() {}
+
+        public Long getSchoolId() { return schoolId; }
+        public void setSchoolId(Long schoolId) { this.schoolId = schoolId; }
+        public LocalDate getDate() { return date; }
+        public void setDate(LocalDate date) { this.date = date; }
+        public List<Long> getAbsentStudentIds() { return absentStudentIds; }
+        public void setAbsentStudentIds(List<Long> absentStudentIds) { this.absentStudentIds = absentStudentIds; }
+        public List<Long> getAbsentTeacherIds() { return absentTeacherIds; }
+        public void setAbsentTeacherIds(List<Long> absentTeacherIds) { this.absentTeacherIds = absentTeacherIds; }
+        public boolean isHoliday() { return isHoliday; }
+        public void setHoliday(boolean holiday) { isHoliday = holiday; }
+        public Long getTeacherId() { return teacherId; }
+        public void setTeacherId(Long teacherId) { this.teacherId = teacherId; }
+    }
+
     public static class AttendanceMarkRequest {
         private Long studentId;
         private LocalDate date;

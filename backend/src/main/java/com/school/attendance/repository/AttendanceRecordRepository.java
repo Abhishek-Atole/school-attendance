@@ -5,6 +5,7 @@ import com.school.attendance.entity.AttendanceRecord.AttendanceStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface AttendanceRecordRepository extends JpaRepository<AttendanceRecord, Long> {
+public interface AttendanceRecordRepository extends JpaRepository<AttendanceRecord, Long>, JpaSpecificationExecutor<AttendanceRecord> {
 
     /**
      * Find attendance record by student and date
@@ -31,7 +32,7 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
      * Find attendance records for a class on a specific date
      */
     @Query("SELECT ar FROM AttendanceRecord ar JOIN ar.student s WHERE " +
-           "s.schoolId = :schoolId AND s.standard = :standard AND s.section = :section AND " +
+           "s.school.id = :schoolId AND s.standard = :standard AND s.section = :section AND " +
            "ar.date = :date ORDER BY s.rollNo")
     List<AttendanceRecord> findClassAttendanceByDate(@Param("schoolId") Long schoolId,
                                                     @Param("standard") String standard,
@@ -74,7 +75,7 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
      */
     @Query("SELECT s.standard, s.section, ar.status, COUNT(ar) " +
            "FROM AttendanceRecord ar JOIN ar.student s " +
-           "WHERE s.schoolId = :schoolId AND ar.date = :date AND ar.isHoliday = false " +
+           "WHERE s.school.id = :schoolId AND ar.date = :date AND ar.isHoliday = false " +
            "GROUP BY s.standard, s.section, ar.status " +
            "ORDER BY s.standard, s.section")
     List<Object[]> getDailyAttendanceSummary(@Param("schoolId") Long schoolId, @Param("date") LocalDate date);
@@ -93,7 +94,7 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
     /**
      * Find students not marked for attendance on a specific date
      */
-    @Query("SELECT s FROM Student s WHERE s.schoolId = :schoolId AND s.standard = :standard AND " +
+    @Query("SELECT s FROM Student s WHERE s.school.id = :schoolId AND s.standard = :standard AND " +
            "s.section = :section AND s.isActive = true AND " +
            "NOT EXISTS (SELECT ar FROM AttendanceRecord ar WHERE ar.student = s AND ar.date = :date)")
     List<Object> findStudentsNotMarkedAttendance(@Param("schoolId") Long schoolId,
@@ -116,7 +117,7 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
      */
     @Query("SELECT ar.date, ar.status, COUNT(ar) " +
            "FROM AttendanceRecord ar JOIN ar.student s " +
-           "WHERE s.schoolId = :schoolId AND s.standard = :standard AND s.section = :section AND " +
+           "WHERE s.school.id = :schoolId AND s.standard = :standard AND s.section = :section AND " +
            "ar.date BETWEEN :startDate AND :endDate AND ar.isHoliday = false " +
            "GROUP BY ar.date, ar.status " +
            "ORDER BY ar.date")
@@ -147,4 +148,63 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
      * Delete attendance records for a specific date (for corrections)
      */
     void deleteByStudentIdAndDate(Long studentId, LocalDate date);
+
+    // ========== PERFORMANCE OPTIMIZED QUERIES ==========
+
+    /**
+     * Optimized query with JOIN FETCH to avoid N+1 problem for attendance with student details
+     */
+    @Query("SELECT ar FROM AttendanceRecord ar " +
+           "JOIN FETCH ar.student s " +
+           "LEFT JOIN FETCH ar.teacher t " +
+           "WHERE ar.date = :date ORDER BY s.rollNo")
+    List<AttendanceRecord> findByDateWithStudentAndTeacher(@Param("date") LocalDate date);
+
+    /**
+     * Paginated attendance records with optimized fetching
+     */
+    @Query(value = "SELECT ar FROM AttendanceRecord ar " +
+           "JOIN FETCH ar.student s " +
+           "LEFT JOIN FETCH ar.teacher t " +
+           "WHERE ar.date BETWEEN :startDate AND :endDate",
+           countQuery = "SELECT COUNT(ar) FROM AttendanceRecord ar " +
+           "WHERE ar.date BETWEEN :startDate AND :endDate")
+    Page<AttendanceRecord> findAttendanceWithPagination(@Param("startDate") LocalDate startDate,
+                                                        @Param("endDate") LocalDate endDate,
+                                                        Pageable pageable);
+
+    /**
+     * Optimized attendance summary query for dashboard
+     */
+    @Query("SELECT s.classEntity.name as className, " +
+           "COUNT(ar) as totalRecords, " +
+           "SUM(CASE WHEN ar.status = 'PRESENT' THEN 1 ELSE 0 END) as presentCount, " +
+           "SUM(CASE WHEN ar.status = 'ABSENT' THEN 1 ELSE 0 END) as absentCount, " +
+           "SUM(CASE WHEN ar.status = 'LATE' THEN 1 ELSE 0 END) as lateCount " +
+           "FROM AttendanceRecord ar " +
+           "JOIN ar.student s " +
+           "WHERE ar.date = :date " +
+           "GROUP BY s.classEntity.name")
+    List<Object[]> getDailyAttendanceSummaryByClass(@Param("date") LocalDate date);
+
+    /**
+     * Efficient query for student attendance trends
+     */
+    @Query("SELECT ar.date as date, ar.status as status " +
+           "FROM AttendanceRecord ar " +
+           "WHERE ar.student.id = :studentId " +
+           "AND ar.date BETWEEN :startDate AND :endDate " +
+           "ORDER BY ar.date DESC")
+    List<Object[]> getStudentAttendanceTrend(@Param("studentId") Long studentId,
+                                           @Param("startDate") LocalDate startDate,
+                                           @Param("endDate") LocalDate endDate);
+
+    /**
+     * Bulk attendance status update (for performance)
+     */
+    @Query("UPDATE AttendanceRecord ar SET ar.status = :status " +
+           "WHERE ar.student.id IN :studentIds AND ar.date = :date")
+    int bulkUpdateAttendanceStatus(@Param("studentIds") List<Long> studentIds,
+                                  @Param("date") LocalDate date,
+                                  @Param("status") AttendanceStatus status);
 }

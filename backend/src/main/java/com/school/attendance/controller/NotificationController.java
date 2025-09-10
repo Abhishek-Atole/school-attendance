@@ -1,9 +1,13 @@
 package com.school.attendance.controller;
 
+import com.school.attendance.dto.ApiResponse;
 import com.school.attendance.entity.NotificationLog;
 import com.school.attendance.entity.NotificationSettings;
+import com.school.attendance.exception.ResourceNotFoundException;
 import com.school.attendance.service.notification.NotificationService;
 import com.school.attendance.service.notification.NotificationSchedulerService;
+import com.school.attendance.util.LoggingUtil;
+import com.school.attendance.util.ValidationUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +18,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -126,20 +131,36 @@ public class NotificationController {
             @RequestParam String subject,
             @RequestParam String message) {
         
+        long startTime = System.currentTimeMillis();
+        LoggingUtil.logMethodEntry(logger, "sendTestEmail", to, subject);
+        
         logger.info("Sending test email to: {}", to);
         
         Map<String, Object> response = new HashMap<>();
         
         try {
+            // Validate email format
+            ValidationUtil.validateEmail(to);
+            ValidationUtil.validateRequired(subject, "Subject");
+            ValidationUtil.validateRequired(message, "Message");
+            
             boolean success = notificationService.sendEmail(to, subject, message);
+            
+            // Log notification attempt
+            LoggingUtil.logNotificationSent("EMAIL", to, subject, success);
             
             response.put("success", success);
             response.put("message", success ? "Test email sent successfully" : "Failed to send test email");
             
+            long executionTime = System.currentTimeMillis() - startTime;
+            LoggingUtil.logMethodExit(logger, "sendTestEmail", executionTime);
+            
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Error sending test email: {}", e.getMessage(), e);
+            logger.error("Error sending test email to {}: {}", to, e.getMessage(), e);
+            LoggingUtil.logNotificationSent("EMAIL", to, subject, false);
+            
             response.put("success", false);
             response.put("message", "Error sending test email: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);

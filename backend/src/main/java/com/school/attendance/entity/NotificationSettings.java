@@ -66,4 +66,33 @@ public class NotificationSettings {
         this.attendanceThreshold = 75.0;
         this.notificationTime = "20:00";
     }
+
+    // Manual setters to fix Lombok issues
+    public void setEmailEnabled(Boolean emailEnabled) {
+        this.emailEnabled = emailEnabled;
+    }
+
+    public void setSmsEnabled(Boolean smsEnabled) {
+        this.smsEnabled = smsEnabled;
+    }
+
+    public void setDailyAbsenteeAlerts(Boolean dailyAbsenteeAlerts) {
+        this.dailyAbsenteeAlerts = dailyAbsenteeAlerts;
+    }
+
+    public void setLowAttendanceAlerts(Boolean lowAttendanceAlerts) {
+        this.lowAttendanceAlerts = lowAttendanceAlerts;
+    }
+
+    public void setHolidayNotifications(Boolean holidayNotifications) {
+        this.holidayNotifications = holidayNotifications;
+    }
+
+    public void setAttendanceThreshold(Double attendanceThreshold) {
+        this.attendanceThreshold = attendanceThreshold;
+    }
+
+    public void setNotificationTime(String notificationTime) {
+        this.notificationTime = notificationTime;
+    }
 }

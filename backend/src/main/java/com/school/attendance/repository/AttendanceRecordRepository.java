@@ -176,7 +176,7 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
     /**
      * Optimized attendance summary query for dashboard
      */
-    @Query("SELECT s.classEntity.name as className, " +
+    @Query("SELECT CONCAT(s.standard, COALESCE(CONCAT('-', s.section), '')) as className, " +
            "COUNT(ar) as totalRecords, " +
            "SUM(CASE WHEN ar.status = 'PRESENT' THEN 1 ELSE 0 END) as presentCount, " +
            "SUM(CASE WHEN ar.status = 'ABSENT' THEN 1 ELSE 0 END) as absentCount, " +
@@ -184,7 +184,7 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
            "FROM AttendanceRecord ar " +
            "JOIN ar.student s " +
            "WHERE ar.date = :date " +
-           "GROUP BY s.classEntity.name")
+           "GROUP BY s.standard, s.section")
     List<Object[]> getDailyAttendanceSummaryByClass(@Param("date") LocalDate date);
 
     /**

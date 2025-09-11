@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * Cached Attendance Service for High-Performance Analytics
  * Implements intelligent caching for attendance summaries and patterns
  */
-@Service
+//@Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)

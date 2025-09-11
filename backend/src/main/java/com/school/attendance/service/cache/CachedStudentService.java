@@ -20,7 +20,7 @@ import java.util.Optional;
  * Cached Student Service for High-Performance Data Access
  * Implements intelligent caching strategies for frequently accessed student data
  */
-@Service
+//@Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)

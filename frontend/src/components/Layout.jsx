@@ -1,9 +1,16 @@
 import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    // The auth context will handle clearing tokens and redirecting
+  };
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -18,7 +25,7 @@ const Layout = ({ children }) => {
         {/* Navbar */}
         <Navbar 
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          onLogout={onLogout}
+          onLogout={handleLogout}
         />
         
         {/* Page content */}

@@ -40,33 +40,33 @@ export const AuthProvider = ({ children }) => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies for session management
         body: JSON.stringify(credentials),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
-      }
-
       const data = await response.json();
       
-      // Store token and user data
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Login failed');
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || data.message || 'Login failed');
+      }
+      
+      // Store token and user data based on our backend response structure
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify({
-        id: data.userId,
-        username: data.username,
-        role: data.role,
-        fullName: data.fullName,
-        email: data.email
+        id: data.user.id,
+        username: data.user.username,
+        role: data.user.role
       }));
 
       setToken(data.token);
       setUser({
-        id: data.userId,
-        username: data.username,
-        role: data.role,
-        fullName: data.fullName,
-        email: data.email
+        id: data.user.id,
+        username: data.user.username,
+        role: data.user.role
       });
 
       // Set default authorization header

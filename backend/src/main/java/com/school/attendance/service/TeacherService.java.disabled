@@ -1,0 +1,268 @@
+package com.school.attendance.service;
+
+import com.school.attendance.entity.Teacher;
+import com.school.attendance.repository.TeacherRepository;
+import com.school.attendance.repository.SchoolRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional
+public class TeacherService {
+
+    private final TeacherRepository teacherRepository;
+    private final SchoolRepository schoolRepository;
+
+    /**
+     * Create a new teacher
+     */
+    public Teacher createTeacher(Teacher teacher) {
+        log.info("Creating new teacher with Employee No: {} for school ID: {}", 
+                teacher.getEmpNo(), teacher.getSchool().getId());
+        
+        // Validate school exists
+        if (!schoolRepository.existsById(teacher.getSchool().getId())) {
+            throw new IllegalArgumentException("School with ID " + teacher.getSchool().getId() + " does not exist");
+        }
+        
+        // Check if Employee Number already exists
+        if (teacherRepository.existsByEmpNoAndSchoolId(teacher.getEmpNo(), teacher.getSchool().getId())) {
+            throw new IllegalArgumentException("Teacher with Employee Number " + teacher.getEmpNo() + " already exists in this school");
+        }
+        
+        // Check if email already exists
+        if (teacher.getEmail() != null && teacherRepository.existsByEmail(teacher.getEmail())) {
+            throw new IllegalArgumentException("Teacher with email " + teacher.getEmail() + " already exists");
+        }
+        
+        Teacher savedTeacher = teacherRepository.save(teacher);
+        log.info("Successfully created teacher with ID: {}", savedTeacher.getId());
+        return savedTeacher;
+    }
+
+    /**
+     * Update an existing teacher
+     */
+    public Teacher updateTeacher(Long teacherId, Teacher updatedTeacher) {
+        log.info("Updating teacher with ID: {}", teacherId);
+        
+        Teacher existingTeacher = getTeacherById(teacherId);
+        
+        // Check if Employee Number is being changed and if it already exists
+        if (!existingTeacher.getEmpNo().equals(updatedTeacher.getEmpNo()) &&
+            teacherRepository.existsByEmpNoAndSchoolId(updatedTeacher.getEmpNo(), existingTeacher.getSchool().getId())) {
+            throw new IllegalArgumentException("Teacher with Employee Number " + updatedTeacher.getEmpNo() + " already exists");
+        }
+        
+        // Check if email is being changed and if it already exists
+        if (updatedTeacher.getEmail() != null && 
+            !updatedTeacher.getEmail().equals(existingTeacher.getEmail()) &&
+            teacherRepository.existsByEmail(updatedTeacher.getEmail())) {
+            throw new IllegalArgumentException("Teacher with email " + updatedTeacher.getEmail() + " already exists");
+        }
+        
+        // Update fields
+        existingTeacher.setEmpNo(updatedTeacher.getEmpNo());
+        existingTeacher.setFirstName(updatedTeacher.getFirstName());
+        existingTeacher.setLastName(updatedTeacher.getLastName());
+        existingTeacher.setDateOfBirth(updatedTeacher.getDateOfBirth());
+        existingTeacher.setGender(updatedTeacher.getGender());
+        existingTeacher.setPrimarySubject(updatedTeacher.getPrimarySubject());
+        existingTeacher.setMobileNumber(updatedTeacher.getMobileNumber());
+        existingTeacher.setEmail(updatedTeacher.getEmail());
+        
+        Teacher savedTeacher = teacherRepository.save(existingTeacher);
+        log.info("Successfully updated teacher with ID: {}", savedTeacher.getId());
+        return savedTeacher;
+    }
+
+    /**
+     * Get teacher by ID
+     */
+    @Transactional(readOnly = true)
+    public Teacher getTeacherById(Long teacherId) {
+        return teacherRepository.findById(teacherId)
+                .orElseThrow(() -> new IllegalArgumentException("Teacher with ID " + teacherId + " not found"));
+    }
+
+    /**
+     * Get teacher by Employee Number and School ID
+     */
+    @Transactional(readOnly = true)
+    public Optional<Teacher> getTeacherByEmpNo(String empNo, Long schoolId) {
+        return teacherRepository.findByEmpNoAndSchoolId(empNo, schoolId);
+    }
+
+    /**
+     * Get teacher by email
+     */
+    @Transactional(readOnly = true)
+    public Optional<Teacher> getTeacherByEmail(String email) {
+        return teacherRepository.findByEmail(email);
+    }
+
+    /**
+     * Get all teachers by school with pagination
+     */
+    @Transactional(readOnly = true)
+    public Page<Teacher> getTeachersBySchool(Long schoolId, Pageable pageable) {
+        return teacherRepository.findBySchoolIdAndIsActiveTrue(schoolId, pageable);
+    }
+
+    /**
+     * Get all active teachers by school
+     */
+    @Transactional(readOnly = true)
+    public List<Teacher> getAllActiveTeachers(Long schoolId) {
+        return teacherRepository.findBySchoolIdAndIsActiveTrueOrderByFirstName(schoolId);
+    }
+
+    /**
+     * Search teachers by name
+     */
+    @Transactional(readOnly = true)
+    public List<Teacher> searchTeachers(String searchTerm, Long schoolId) {
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            return List.of();
+        }
+        
+        return teacherRepository.searchByNameList(schoolId, searchTerm.trim());
+    }
+
+    /**
+     * Get teachers by primary subject
+     */
+    @Transactional(readOnly = true)
+    public List<Teacher> getTeachersByPrimarySubject(Long schoolId, String subject) {
+        return teacherRepository.findBySchoolIdAndPrimarySubjectAndIsActiveTrueOrderByFirstName(schoolId, subject);
+    }
+
+    /**
+     * Get teachers by subject (including secondary subjects)
+     */
+    @Transactional(readOnly = true)
+    public List<Teacher> getTeachersBySubject(Long schoolId, String subject) {
+        return teacherRepository.findBySubjectList(schoolId, subject);
+    }
+
+    /**
+     * Get teachers assigned to a specific class
+     */
+    @Transactional(readOnly = true)
+    public List<Teacher> getTeachersByClass(Long schoolId, String className) {
+        return teacherRepository.findByAssignedClass(schoolId, className);
+    }
+
+    /**
+     * Assign subjects to a teacher
+     */
+    public Teacher assignSubjects(Long teacherId, Set<String> subjects) {
+        log.info("Assigning subjects {} to teacher ID: {}", subjects, teacherId);
+        
+        Teacher teacher = getTeacherById(teacherId);
+        teacher.setSubjects(subjects);
+        
+        Teacher savedTeacher = teacherRepository.save(teacher);
+        log.info("Successfully assigned subjects to teacher ID: {}", teacherId);
+        return savedTeacher;
+    }
+
+    /**
+     * Assign classes to a teacher
+     */
+    public Teacher assignClasses(Long teacherId, Set<String> classes) {
+        log.info("Assigning classes {} to teacher ID: {}", classes, teacherId);
+        
+        Teacher teacher = getTeacherById(teacherId);
+        teacher.setAssignedClasses(classes);
+        
+        Teacher savedTeacher = teacherRepository.save(teacher);
+        log.info("Successfully assigned classes to teacher ID: {}", teacherId);
+        return savedTeacher;
+    }
+
+    /**
+     * Get all subjects taught in school
+     */
+    @Transactional(readOnly = true)
+    public List<String> getAllSubjects(Long schoolId) {
+        return teacherRepository.findAllSubjectsBySchoolId(schoolId);
+    }
+
+    /**
+     * Get all assigned classes in school
+     */
+    @Transactional(readOnly = true)
+    public List<String> getAllAssignedClasses(Long schoolId) {
+        return teacherRepository.findAllAssignedClassesBySchoolId(schoolId);
+    }
+
+    /**
+     * Count total teachers in school
+     */
+    @Transactional(readOnly = true)
+    public long countTotalTeachers(Long schoolId) {
+        return teacherRepository.countBySchoolIdAndIsActiveTrue(schoolId);
+    }
+
+    /**
+     * Deactivate a teacher (soft delete)
+     */
+    public void deactivateTeacher(Long teacherId) {
+        log.info("Deactivating teacher with ID: {}", teacherId);
+        
+        Teacher teacher = getTeacherById(teacherId);
+        teacher.setIsActive(false);
+        teacherRepository.save(teacher);
+        
+        log.info("Successfully deactivated teacher with ID: {}", teacherId);
+    }
+
+    /**
+     * Activate a teacher
+     */
+    public void activateTeacher(Long teacherId) {
+        log.info("Activating teacher with ID: {}", teacherId);
+        
+        Teacher teacher = teacherRepository.findById(teacherId)
+                .orElseThrow(() -> new IllegalArgumentException("Teacher with ID " + teacherId + " not found"));
+        teacher.setIsActive(true);
+        teacherRepository.save(teacher);
+        
+        log.info("Successfully activated teacher with ID: {}", teacherId);
+    }
+
+    /**
+     * Delete a teacher permanently
+     */
+    public void deleteTeacher(Long teacherId) {
+        log.info("Permanently deleting teacher with ID: {}", teacherId);
+        
+        if (!teacherRepository.existsById(teacherId)) {
+            throw new IllegalArgumentException("Teacher with ID " + teacherId + " not found");
+        }
+        
+        teacherRepository.deleteById(teacherId);
+        log.info("Successfully deleted teacher with ID: {}", teacherId);
+    }
+
+    /**
+     * Check if teacher can mark attendance for a specific class
+     */
+    @Transactional(readOnly = true)
+    public boolean canMarkAttendanceForClass(Long teacherId, String className) {
+        Teacher teacher = getTeacherById(teacherId);
+        return teacher.getAssignedClasses() != null && 
+               teacher.getAssignedClasses().contains(className);
+    }
+}

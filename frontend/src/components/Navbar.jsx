@@ -1,10 +1,13 @@
 import { Menu, Bell, User, LogOut, School, Settings, Shield, BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useI18n } from '../contexts/I18nContext';
+import LanguageSelector from './LanguageSelector';
 
 const Navbar = ({ onToggleSidebar }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const { user, logout, isAdmin, isTeacher, isStudent } = useAuth();
+  const { t } = useI18n();
 
   const handleLogout = () => {
     setShowUserMenu(false);
@@ -42,7 +45,7 @@ const Navbar = ({ onToggleSidebar }) => {
               <School className="h-5 w-5 text-white" />
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-xl font-bold text-gray-900">School Attendance</h1>
+              <h1 className="text-xl font-bold text-gray-900">{t('app.name')}</h1>
               <p className="text-sm text-gray-500">Management System</p>
             </div>
           </div>
@@ -50,6 +53,9 @@ const Navbar = ({ onToggleSidebar }) => {
 
         {/* Right side */}
         <div className="flex items-center space-x-4">
+          {/* Language Selector */}
+          <LanguageSelector className="hidden sm:block" />
+          
           {/* Role Badge */}
           <div className={`hidden md:flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${getRoleColor()}`}>
             {getRoleIcon()}
@@ -104,7 +110,7 @@ const Navbar = ({ onToggleSidebar }) => {
                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     <User className="h-4 w-4 mr-3" />
-                    View Profile
+                    {t('profile.view')}
                   </button>
                   
                   {/* Settings - Admin only */}
@@ -114,9 +120,14 @@ const Navbar = ({ onToggleSidebar }) => {
                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
                       <Settings className="h-4 w-4 mr-3" />
-                      System Settings
+                      {t('nav.settings')}
                     </button>
                   )}
+                  
+                  {/* Language selector for mobile */}
+                  <div className="sm:hidden px-4 py-2">
+                    <LanguageSelector />
+                  </div>
                   
                   {/* Divider */}
                   <div className="border-t border-gray-100 my-1"></div>
@@ -127,7 +138,7 @@ const Navbar = ({ onToggleSidebar }) => {
                     className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50"
                   >
                     <LogOut className="h-4 w-4 mr-3" />
-                    Sign out
+                    {t('auth.logout')}
                   </button>
                 </div>
               </div>

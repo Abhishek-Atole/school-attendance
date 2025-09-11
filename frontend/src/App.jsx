@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Import contexts
 import { AuthProvider } from './contexts/AuthContext';
+import { I18nProvider } from './contexts/I18nContext';
 
 // Import pages
 import Login from './pages/Login';
@@ -32,10 +33,11 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
-          <div className="min-h-screen bg-gray-50">
-            <Routes>
+      <I18nProvider>
+        <AuthProvider>
+          <Router>
+            <div className="min-h-screen bg-gray-50">
+              <Routes>
               {/* Public route */}
               <Route path="/login" element={<Login />} />
               
@@ -146,7 +148,8 @@ function App() {
           </div>
         </Router>
       </AuthProvider>
-    </QueryClientProvider>
+    </I18nProvider>
+  </QueryClientProvider>
   );
 }
 

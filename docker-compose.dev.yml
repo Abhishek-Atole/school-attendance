@@ -1,0 +1,45 @@
+version: '3.8'
+
+# Development override for docker-compose
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  backend:
+    environment:
+      # Development-specific environment variables
+      SPRING_PROFILES_ACTIVE: dev
+      SHOW_SQL: true
+      SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+      
+      # Development email configuration (use Mailhog for testing)
+      SPRING_MAIL_HOST: mailhog
+      SPRING_MAIL_PORT: 1025
+      SPRING_MAIL_USERNAME: ""
+      SPRING_MAIL_PASSWORD: ""
+      
+    volumes:
+      # Mount source code for hot reload (if using Spring Boot DevTools)
+      - ./backend/src:/app/src:ro
+      - ./backend/target:/app/target
+    ports:
+      # Expose debug port
+      - "5005:5005"
+    command: ["java", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005", "-jar", "/app/app.jar"]
+
+  frontend:
+    environment:
+      REACT_APP_ENV: development
+    volumes:
+      # Mount source for development
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+
+  # MailHog for email testing in development
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: school-attendance-mailhog
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI port
+    networks:
+      - school-network
